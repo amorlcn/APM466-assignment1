@@ -1,0 +1,182 @@
+---
+title: "Untitled"
+author: "Yi Zheng"
+date: "October 25, 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r eval = TRUE}
+#Problem 1
+#1
+data_btc<-read.csv("/Users/user/Desktop/sta457/Assignment 2/BTC.csv",header = TRUE)
+BTC<-data_btc[1:1021,]
+BTC_price<-as.numeric(gsub(",","",BTC$Close.USD))
+qqnorm(BTC_price,datax = TRUE,main = "untransformed")
+qqline(BTC_price,datax = TRUE,col="red")
+boxplot(BTC_price,main = "untransformed")
+plot(density(BTC_price),main = "untransformed")
+#Data is not normally distributed.Data is asymmetrically distributed, 
+#but right skewed. 
+#It's hard to tell if the distribution is heavy tailled or not due to 
+#only outliners exist on oneside.
+#Right tail is havier than left tail.
+
+#2
+sqrt.BTC<-sqrt(BTC_price)
+log.BTC<-log(BTC_price)
+qqnorm(sqrt.BTC,datax = TRUE,main = "square-root transformed")
+qqline(sqrt.BTC,datax = TRUE,col="red")
+qqnorm(log.BTC,datax = TRUE,main = "log-transformed")
+qqline(log.BTC,datax = TRUE,col="red")
+boxplot(sqrt.BTC,main = "square-root transformed")
+boxplot(log.BTC,main = "log-transformed")
+plot(density(sqrt.BTC),main = "square-root transformed")
+plot(density(log.BTC),main = "log-transformed")
+#Transformed data is not nolmally distributed in both cases as well. 
+#Square-root transformed data is symmertrical while log transformed 
+#data is left skewed. It's hard to tell if two distributions are heavy tailed.
+#In square-rooted distribution, right tail is slightly heavier than the left,
+#while in log-transformed distribution, the left tail is heavier than the right.
+
+#3
+library(MASS)
+boxcox<-boxcox(BTC_price~1,lambda=seq(0,1,1/100))
+lambdamax<-boxcox$x[which.max(boxcox$y)]
+lambdamax
+
+#4
+lambdabar<-mean(BTC_price)
+std<-sd(BTC_price)
+left<-lambdabar-qnorm(0.99)*std/sqrt(1021)
+right<-lambdabar+qnorm(0.99)*std/sqrt(1021)
+#CI is [5942.098,6469.768]
+
+#5
+library(fGarch)
+sstdFit(BTC_price)
+
+#6
+#With skewed t-distribution, mean is 6.0e+03, sd is 3.9e+03. 
+```
+
+```{r eval = TRUE}
+#Problem 2
+#1
+data_gold<-read.csv('/Users/user/Desktop/sta457/Assignment 2/LBMA-GOLD.csv',header = TRUE)
+gold_old<-data_gold[1:708,]
+gold<-na.omit(gold_old$USD..PM.)
+n<-length(gold)
+lrtn<-diff(log(gold),lag=1)
+year_gold<-2017+(1:n)*(2019.8-2017)/n
+plot(year_gold[-704],lrtn,main = "log return of gold", xlab="time",
+     type="l", ylab="log return")
+#Log return is  fluctuating in a small range, therefore it's almost stationary
+
+#2
+qqnorm(lrtn,datax = TRUE,main = "gold")
+qqline(lrtn,datax = TRUE,col="red")
+boxplot(lrtn)
+plot(density(lrtn))
+#Distribution of gold is not normal. This distribution is slightly left skewed
+#and with heavy tail.
+
+#3
+library("MASS")
+library("fGarch")
+t<-fitdistr(lrtn,"t")
+t
+logl<-function(par){
+  if(par[2]>0&par[3]>0) return(-sum(log(dt((lrtn-par[1])/par[2],df=par[3])/par[2])))
+  else return(Inf)
+}
+tmax<-optim(c(-0.0002,0.006,2.4),logl)
+tmax
+
+#4
+AIC<-2*tmax$value+2*3
+BIC<-2*tmax$value+2*log(n)*3
+AIC
+BIC
+```
+
+```{r eval= TRUE}
+#Problem 3
+#1
+library("fGarch")
+data_IBM<-read.csv('/Users/user/Desktop/sta457/Assignment 2/IBM.csv',header = TRUE)
+IBM<-data_IBM[1:704,]
+m<-mean(IBM$Adj.Close)
+sd<-sd(IBM$Adj.Close)
+kur<-kurtosis(IBM$Adj.Close)
+ske<-skewness(IBM$Adj.Close)
+m
+sd
+kur
+ske
+#2
+stdFit(IBM$Adj.Close)
+
+#3
+n<-length(IBM)
+IBMmfrs<-rep(0,1000)
+set.seed(2000)
+#model-free
+for (i in (1:1000)) {
+  index<-sample(1:n,replace = TRUE)
+  IBMmfrs[i]<-IBM$Adj.Close[index]
+}
+IBMmfrs
+
+#t-distribution
+IBMtdrs<-rep(0,1000)
+for (j in (1:1000)) {
+  index<-rstd(1000, 138.311938, 13.542733, 2.631856)
+  IBMtdrs[j]<-mean(index)
+}
+IBMtdrs
+
+#4
+qqnorm(IBMmfrs,main = "model-free resampling")
+qqline(IBMmfrs,col="red")
+plot(density(IBMmfrs))
+qqnorm(IBMtdrs,main = "t-distribution fitted resampling")
+qqline(IBMtdrs,col="red")
+plot(density(IBMtdrs))
+adj.close<-c("model-free","fitted model")
+boxplot(IBMmfrs,IBMtdrs,names = adj.close, horizontal = TRUE, 
+        main = "IBM Adj.close", xlab = "Adj.close")
+```
+
+```{r eval = TRUE}
+#5
+#model-free
+lambdabar1<-mean(IBMmfrs)
+std1<-sd(IBMmfrs)
+left1<-lambdabar1-qnorm(0.95)*std1/sqrt(1000)
+right1<-lambdabar1+qnorm(0.95)*std1/sqrt(1000)
+left1
+right1
+#CI is [134.174,134.1828]
+#t-distribution model
+lambdabar2<-mean(IBMtdrs)
+std2<-sd(IBMtdrs)
+left2<-lambdabar2-qnorm(0.95)*std2/sqrt(1000)
+right2<-lambdabar2+qnorm(0.95)*std2/sqrt(1000)
+left2
+right2
+#CI is [138.2922,138.3348]
+
+#6
+library("Metrics")
+bs1<-bias(IBM$Adj.Close,IBMmfrs)
+bs2<-bias(IBM$Adj.Close,IBMtdrs)
+
+#7
+mse1<-var(IBMmfrs)+bs1^2
+mse2<-var(IBMtdrs)+bs2^2
+mse1
+mse2
